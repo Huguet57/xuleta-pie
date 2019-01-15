@@ -1,0 +1,183 @@
+---
+title: "ResumR"
+output: pdf_document
+---
+```{r, include = F}
+library(car)
+library(emmeans)
+library(RcmdrMisc)
+library(HH)
+library(tables)
+```
+
+```{r}
+db <- read.csv2('COL.csv')
+```
+
+# Regression and lm
+## Estadística descriptiva
+
+Per veure format dades
+```{r}
+head(db)
+```
+
+
+Plot de totes les variables respecte totes i correlation matrix:
+```{r}
+scatterplotMatrix(db, diagonal = F, smooth = F)
+cor(db)
+```
+Sembla ser que les 3 variables explicatives estan bastant correlacionades entre sí.
+
+## Model lineal (regression line)
+
+En primer lloc probem un model lineal senzill
+```{r}
+m1 <- lm(C~A+H+W, data = db)
+summary(m1)
+```
+Per comprobar que no hi hagi cap problema de multicolinearitat:
+```{r}
+vif(m1)
+```
+Sembla ser que el VIF de l'alçada i el pes és bastant alt, probem d'eliminar l'edat de les variables ja que és la menys significativa de les dos amb vif elevat:
+```{r}
+m2 <- lm(C~H+W, data = db)
+summary(m2)
+```
+Tornem a comprobar el vif:
+```{r}
+vif(m2)
+```
+
+
+Sembla que ara el VIF és prou baix en les dues variables i el percentatge de variabilitat explicada ha disminuit molt poc.
+Analitzem ara el model:
+
+### Residuals vs fitted
+
+Per observar els residuals vs els fitted plotem el model
+```{r}
+plot(m2)
+```
+No s'observem patrons en els residus i sembla que hi ha homocedasticity, per assegurar-ho fem un Levene test:
+```{r}
+leveneTest(m2$residuals ~ as.factor(H), data = db)
+leveneTest(m2$residuals ~ as.factor(W), data = db)
+```
+Efectivament, respecte les dues variables del model la variança sembla constant. (No hi ha evidencies estadístiques que ens permetin rebutjar homogeneïtat en la variança)
+
+### Normalitat
+
+En el Q-Q plot s'observa linealitat (sobretot pel centre), per assegurar que hi ha normalitat realitzem un shapiro test:
+```{r}
+shapiro.test(m2$residuals)
+```
+Sembla ser que hi ha normalitat.
+
+També ho podem comprobar amb un chi-square test.
+
+### Significancia dels beta
+
+```{r}
+anova(m2)
+```
+
+Efectivament son diferents de 0.
+
+També podem veure-ho amb els intervals de confiança
+```{r}
+confint(m2, lebel = 0.95)
+```
+Cap dels dos inclou el 0.
+
+### Plot predicts
+
+```{r}
+#ci.plot(m2) només amb una variable
+```
+
+### Observacions influents
+
+Busquem observacions amb leverage gran:
+(plot model)
+Sembla ser que les observacions 26, 44 i 82 podrien ser influents ja que tenen una mica de leverage i els residus son alts. Probablement no ho son ja que el leverage es mes petit que $3p/N$.
+
+# Lm ANCOVA
+
+```{r}
+dbi <- read.csv2('Iogurt.csv')
+```
+
+## Estadistica descriptiva
+
+```{r}
+head(dbi)
+```
+Fem un plot dels lactobacilus en funcio del temps distingint segons la temperatura de fermentació:
+```{r}
+sp(lactob ~ dia|Ferm, boxplot = F, smooth = F, data = dbi)
+```
+Podem observar diferencies en el pendent i l'intercept, per tant sembla bona opció afegir interacció al model.
+
+Comrpobem la correlació entre ph i bacteris:
+```{r}
+cor(dbi$lactob, dbi$pH)
+```
+
+Per tant, fer un model pels lactobacilus o pel ph es gairebé el mateix.
+
+Fem taules:
+```{r}
+dbi$Fdia<-as.factor(dbi$dia)
+tabular((pH+strep+lactob)*Ferm*((n=1)+mean+sd)~Fdia,dbi)
+```
+## Altres comandes
+```{r}
+#emm<-emmeans(model1,~DOSEFACTOR) # Mitjana separant per dosefactor
+# pairs(emm) els compara un a un (Tukey)
+# plot (emm, level = 9.99, adjust = "tukey")
+# confint dona int de confiança
+```
+
+# GLM
+
+## Binomial
+```{r}
+insc <- read.csv2('insecticide.csv')
+insc <- insc[-1,]
+sp(log((DIED/T)/(1-DIED/T)) ~ log(DOSE), smooth = F, boxplot = F, data = insc) #canonic link en funcio de log dose
+```
+Apliquem glm resposta binomial en funcio de log(dosi)
+```{r}
+glm1 <- glm(cbind(DIED, T) ~ log(DOSE), family = binomial, data = insc)
+summary(glm1)
+```
+
+Pearson residuals:
+```{r}
+pres <- rstandard(glm1, type = "pearson")
+X2 <- sum(pres^2)
+phi = X2/glm1$df.residual
+```
+
+Per tant caldria canviar el dispersion parameter.
+En aquest cas es millor usar el probit.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
