@@ -11,6 +11,7 @@ library(tables)
 ```
 
 ```{r}
+setwd("~/Desktop/UNI/3rcurs/1rquatr/pie/dades/")
 db <- read.csv2('COL.csv')
 ```
 
@@ -21,7 +22,6 @@ Per veure format dades
 ```{r}
 head(db)
 ```
-
 
 Plot de totes les variables respecte totes i correlation matrix:
 ```{r}
@@ -37,11 +37,14 @@ En primer lloc probem un model lineal senzill
 m1 <- lm(C~A+H+W, data = db)
 summary(m1)
 ```
+
+### Multicolinealitat (VIF)
+
 Per comprobar que no hi hagi cap problema de multicolinearitat:
 ```{r}
 vif(m1)
 ```
-Sembla ser que el VIF de l'alçada i el pes és bastant alt, probem d'eliminar l'edat de les variables ja que és la menys significativa de les dos amb vif elevat:
+Sembla ser que el VIF de l'alçada i l'edat és bastant alt, probem d'eliminar l'edat de les variables ja que és la menys significativa de les dos amb vif elevat. També podríem eliminar la que tingui VIF més elevat. Si les variables són significatives totes, per molt que estiguin molt correlacionades no n'eliminem cap.
 ```{r}
 m2 <- lm(C~H+W, data = db)
 summary(m2)
@@ -53,6 +56,8 @@ vif(m2)
 
 
 Sembla que ara el VIF és prou baix en les dues variables i el percentatge de variabilitat explicada ha disminuit molt poc.
+
+
 Analitzem ara el model:
 
 ### Residuals vs fitted
@@ -61,12 +66,30 @@ Per observar els residuals vs els fitted plotem el model
 ```{r}
 plot(m2)
 ```
+El que hem de mirar d'observar en el plot del model és el següent:
+
+- Abans de res, en un *scatterplot de les $y$ respecte les $x$* hauríem d'observar linealitat.
+
+- En el scatterplot dels $\hat{e}_i$ vs. $\hat{y}_i$, és a dir, en el *Residuals vs Fittet* no hauríem de veure patrons. Si hi ha algun patró, el meu model s'està deixant de capturar alguna cosa. Els residus han de ser aleatoris i petits.
+
+- En el *QQ-plot per a* $\hat{e}_i$ s'hauria d'observar linealitat, ja que estem comparant els quartils dels nostres residus amb els d'una normal $N(0,1)$.
+
+- En el $\sqrt{\text{standarized residuals}}$* vs fittet* tampoc hauríem d'observar patrons.
+
+- Pel que fa a la homocedasticitat, podem fer un *predicted vs residuals* plot i observar que la variabilitat és constant.
+
+- En el plor dels *standarized residuals vs Leverage* busquem les observacions influents, que seran aquelles que tinguin alt residus i alt Leverage (26, 44, 82) en aquest cas. Tot i així, per ser considerades influents, han de tenir un leverage major que $3p/n$
+
+```{r}
+plot(predict(m2), resid(m2))
+abline(h=0, lty=2)
+```
 No s'observem patrons en els residus i sembla que hi ha homocedasticity, per assegurar-ho fem un Levene test:
 ```{r}
 leveneTest(m2$residuals ~ as.factor(H), data = db)
 leveneTest(m2$residuals ~ as.factor(W), data = db)
 ```
-Efectivament, respecte les dues variables del model la variança sembla constant. (No hi ha evidencies estadístiques que ens permetin rebutjar homogeneïtat en la variança)
+Efectivament, donat que el Pr(>F) és major que 0.05 en ambdós casos, podem afirmar que respecte les dues variables del model la variança sembla constant. (No hi ha evidencies estadístiques que ens permetin rebutjar homogeneïtat en la variança)
 
 ### Normalitat
 
@@ -82,11 +105,12 @@ També ho podem comprobar amb un chi-square test.
 
 ```{r}
 anova(m2)
+Anova(m2)
 ```
 
-Efectivament son diferents de 0.
+Efectivament son diferents de 0, ja que el Pr(>F) és major que 0.05 en tots els casos. En el test anova, les sumes dels quadrats depenen de l'ordre en què els factors s'han entrat al model. En canvi, en el test Anova, l'ordre no es té en compte.
 
-També podem veure-ho amb els intervals de confiança
+Per veure si les covariants són estadísticament significatives, podem observar-ho amb els intervals de confiança de les $\beta$'s, mirant si contenen el 0 o no. Si el contenen, no són estadísticament significatives.
 ```{r}
 confint(m2, lebel = 0.95)
 ```
@@ -94,9 +118,47 @@ Cap dels dos inclou el 0.
 
 ### Plot predicts
 
+Per veure els intervals de confiança dels valors predits:
+
 ```{r}
-#ci.plot(m2) només amb una variable
+C0<-data.frame(cbind(W=c(65,75,65),A=c(15,15,12),H=c(150,150,150)), row.names=1:3)
+predict(m1, C0, interval="confidence", level=.95, se.fit=T)
 ```
+On podem veure, en primer lloc una matriu amb una fila amb el valor predit per les dades donades, i l'interval de confiança corresponent.
+
+Per veure els intervals de predicció dels valors predits:
+
+```{r}
+C0<-data.frame(cbind(W=c(65,75,65),A=c(15,15,12),H=c(150,150,150)), row.names=1:3)
+predict(m1, C0, interval="prediction", level=.95, se.fit=T)
+```
+
+
+```{r}
+m3 <- lm(C~W, db)
+ci.plot(m3) #només amb una variable
+```
+### Estimació de la variancia (S)
+
+Si ens demanen a un model lineal estimar la S per a uns certs valors en concret, donat que per defició de model lineal es té homocedasticitat, es a dir, que $\sigma_i^2 = \sigma^2$, llavors la variància estimada serà:
+
+```{r}
+summary(m2)$sigma
+```
+
+### Estimació de esperança i variància (standard deviation) amb modificació de la variable resposta
+
+Si a la nostra variable resposta $H$ li hem aplicat una modificació a través d'una funció $g(H)$, llavors hem de tenir en compte que, si $f(H) = g^{-1}(H)$,
+
+$$
+m = \hat{E}(g(H) | Days = a) \quad \text{and} \quad s = \sqrt{\hat{Var}(g(H) | Days = a)} \\
+
+E(H | Days = a) = f(m) \quad  \text{and} \quad \sqrt{Var(H | Days = a)} = s · |f'(m)|
+$$
+
+### anova de dos models
+
+
 
 ### Observacions influents
 
@@ -107,6 +169,7 @@ Sembla ser que les observacions 26, 44 i 82 podrien ser influents ja que tenen u
 # Lm ANCOVA
 
 ```{r}
+setwd("~/Desktop/UNI/3rcurs/1rquatr/pie/dades/")
 dbi <- read.csv2('Iogurt.csv')
 ```
 
@@ -117,9 +180,21 @@ head(dbi)
 ```
 Fem un plot dels lactobacilus en funcio del temps distingint segons la temperatura de fermentació:
 ```{r}
+sp(pH ~ dia|Ferm, boxplot=F, smooth=F, data = dbi)
+sp(strep ~ dia|Ferm, boxplot=F, smooth=F, data = dbi)
 sp(lactob ~ dia|Ferm, boxplot = F, smooth = F, data = dbi)
 ```
-Podem observar diferencies en el pendent i l'intercept, per tant sembla bona opció afegir interacció al model.
+Per que respecta al pH observem:
+
+1) Els iogurts fermentats a T42 tenen els primers dies un pH superior al altres. Ara bé, a mida que passen els dies els valors de pH son pràcticament indistingibles entre les dues temperatures.
+2) La manera en que el pH decreix a mida que passen els dies es mes dràstica pels iogurts fermentats a T42 que els fermentats a T43.5
+3) Si considerem un *grup d’observacions* com les observacions que corresponen a un dia concret i a una temperatura de fermentació fixa, no es veuen moltes diferencies entre la variabilitat dels valors dels diferents grups d’observacions.
+
+Pel que respecta a la variable Strep observem bàsicament el mateix que abans, però ara les diferencies entre les dues temperatures de Fermentació a l’inici no son tant acusades. Pels dies 21 i 28 i pel que respecte a la temperatura 42 de fermentació s’observen uns valors de pH que varien molt mes que per les altres temperatures i dies.
+
+Pel que respecta a la variable Lactob observem: Hi ha dos iogurts fermentats a temperatura 42 que tenen una presencia de Lactobacilus molt mes superior que la resta de iogurts. Aquests dos continuen tenint valors mes alts que la resta a mida que passen els dies.
+
+En general podem concloure que tant el pH com l’Strep com el Lactob van decreixent en el iogurt a mida que passen els dies des de la seva fermentació. Aquest decreixement sembla mes marcat pels iogurts fermentats a T42 que pels fermentats a T43.5. Podríem dir que quan han passat mes de 20 dies des de la fermentació, no sembla que hi hagi diferencies entre els dos grups de iogurts er a cap de les tres variables resposta.
 
 Comrpobem la correlació entre ph i bacteris:
 ```{r}
