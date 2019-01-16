@@ -1,30 +1,13 @@
 ---
 title: "ResumR"
-output:
-  pdf_document: default
-  html_document:
-    df_print: paged
+output: pdf_document
 ---
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r, echo = F}
-library(lattice)
-library(latexpdf)
-library(RcmdrMisc)
-library(carData)
-library(sandwich)
-library(multcompView)
+```{r, include = F}
+library(car)
 library(emmeans)
+library(RcmdrMisc)
 library(HH)
-library(doBy)
-library(Hmisc)
-library(survival)
-library(Formula)
-library(ggplot2)
 library(tables)
-library(latexpdf)
 ```
 
 ```{r}
@@ -167,17 +150,18 @@ summary(m2)$sigma
 
 Si a la nostra variable resposta $H$ li hem aplicat una modificació a través d'una funció $g(H)$, llavors hem de tenir en compte que, si $f(H) = g^{-1}(H)$,
 
-$m = \hat{E}(g(H) | Days = a) \quad \text{and} \quad s = \sqrt{\hat{Var}(g(H) | Days = a)}$
+$$
+m = \hat{E}(g(H) | Days = a) \quad \text{and} \quad s = \sqrt{\hat{Var}(g(H) | Days = a)} \\
 
-$E(H | Days = a) = f(m) \quad  \text{and} \quad \sqrt{Var(H | Days = a)} = s · |f'(m)|$
-
+E(H | Days = a) = f(m) \quad  \text{and} \quad \sqrt{Var(H | Days = a)} = s · |f'(m)|
+$$
 
 ### anova de dos models
 
 Ens hem de mirar si el Pf(>F) és més gran que 0.05. En cas afirmatiu, es rebutja la $H_0$, és a dir, es rebutja el first_model.
 
 ```{r}
-#anova(first_model, second_model, test=F)
+anova(first_model, second_model, test=F)
 ```
 ### Observacions influents
 
@@ -264,7 +248,7 @@ residualPlot(gm1, smooth = F)
 Pels standarized Pearson Residuals:
 
 ```{r}
-plot(rstandard(gm1, ty="pearson"))
+plot(rstandard(m1, ty="pearson"))
 abline(h=c(-3,-2,0,2,3))
 ```
 Per saber quins compleixen alguna condició en concret, podem utilitzar la següent comanda:
@@ -291,13 +275,13 @@ Podem mirar si els Pearsons Stadistics tenen o no homocedasticitat amb el Levenn
 ### Intervals de confiança 
 
 ```{r}
-#CLD(emmeans(mod2,~pH | Biomass, ty="response"))
+CLD(emmeans(mod2,~pH | Biomass, ty="response"))
 ```
 ```{r}
-#CLD(emmeans(mod2,~pH | Biomass, at=list(Biomass=c(1,3,7)), ty="response"))
+CLD(emmeans(mod2,~pH | Biomass, at=list(Biomass=c(1,3,7)), ty="response"))
 ```
 ```{r}
-#pairs(emmeans(mod2,~pH | Biomass, at=list(Biomass=c(1,3,7))))
+pairs(emmeans(mod2,~pH | Biomass, at=list(Biomass=c(1,3,7))))
 ```
 
 ## Binomial
@@ -328,61 +312,21 @@ X2
 phi
 ```
 
-### Over / underdisperssion
-
-Tant en la binomial com en la Poisson, aproximant el $\hat{\phi}$ per $X^2/(n-p)$, si és major que 1, tenim overdisperssion, si es menor que 1 tenim underdisperssion.
-
-## Poisson
+# Poisson
 
 Canonical link = log
 Variance function = $\mu$
 
-### Predicted values
-
-```{r}
-#customDays <- data.frame(Days=c(0,105,150))
-#predC <- predict(mC, customDays, ty="response") # mu
-#standevC <- sqrt(predC * mC$deviance/mC$df.residual) # sd
-```
-
-L'standard deviation es multiplica per la variance function de la distribució que estem agafant. En aquest cas, donat que la variance function és $/mu$, es multiplica pels valors predits
-
-## Gamma
-
-Canonical link= $1/\mu$
-Variance function = $\mu^2$
 
 
 # Comparació entre Models
 
-En primer lloc busquem la logLike més gran.
-```{r}
-#logLik(mod)
-```
 
-En segon lloc, AIC més petit.
-```{r}
-#AIC(mod)
-```
-
-Finalment podem comparar models niuats amb la deviancia.
-
-#Altres
+# Altres
 
 A ~ B + C No hi ha interacció
 A ~ B * C Sí hi ha interacció
 
-
-```{r}
-#Model quasi-likelihood
-
-#summary(mC <- glm(H ~ Days, family = quasi(link=log, var="mu"), data = dd) ))
-
-#Passar una variable contínua a factor
-
-#db$FDays <- as.factor(db$Days)
-#modB2 <- glm(H~Days+FDays, family = Gamma(link="log"), db)
-```
 
 
 
